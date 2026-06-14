@@ -1,0 +1,170 @@
+ 
+#include <LiquidCrystal_I2C.h>
+#include <Wire.h>
+#include <DHT.h>          
+
+//definição pinos
+#define ECHO_PIN        7
+#define TRIG_PIN        6
+#define DHT_PIN         5   
+#define SOLO_PIN        A0  
+#define Rele_Bomba      9  
+#define Rele_Vent       10
+#define Rele_Aquecedor  11
+ 
+// Tipo de sensor DHT
+#define DHTTYPE         DHT11 
+
+//display
+#define PIN_SCL         A5
+#define PIN_SDA         A4
+LiquidCrystal_I2C lcd(0x27, 16, 2); 
+
+// Inicializar o sensor DHT
+DHT dht(DHT_PIN, DHTTYPE);    
+
+#define SOUND_SPEED 0.034
+long duration;
+float distanceCm;
+
+// Variáveis para o DHT
+float temperatura;            
+float humidadeAr; 
+int temp_max=30;// definicao da temperatura maxima
+int temp_min=28;// definicao da temperatura minima
+
+// Variável para o Solo
+int humidadeSolo;             
+int humidadeSoloPorcentagem; 
+int hum_max = 70;//definicao da humidade maxima solo
+int dist_min = 15;//definicao do nivel minimo deposito
+
+// Variável para o controlo do Carrossel
+int ecraAtual = 0; 
+
+void setup() {
+ // Serial.begin(115200);//porta serie iniciar
+
+  //definição saídas/entradas
+  pinMode(TRIG_PIN, OUTPUT); 
+  pinMode(ECHO_PIN, INPUT);
+  pinMode(Rele_Bomba, OUTPUT);
+  pinMode(Rele_Aquecedor, OUTPUT);
+  pinMode(Rele_Vent, OUTPUT);
+
+  //iniciar sistema
+  digitalWrite(Rele_Bomba,LOW);
+  digitalWrite(Rele_Aquecedor,LOW);
+  digitalWrite(Rele_Vent,LOW);
+
+  //iniciar DHT snesor temperatura
+  dht.begin();                
+
+  //iniciar display
+  Wire.begin();
+  lcd.init();
+  lcd.backlight();
+  lcd.setCursor(0, 0);
+  lcd.print("Estufa  v1.0");
+  lcd.setCursor(0, 1);
+  lcd.print("A iniciar...");
+  delay(2000);
+  lcd.clear();
+}
+
+
+//programa principal
+void loop() {
+
+//procedimento leitura temperatura
+temperatura_ar();
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Temperatura ar");
+  lcd.setCursor(0, 1);
+  lcd.print(temperatura);
+delay (2000); 
+//temperatura alta - liga ventilacao
+if (temperatura > temp_max){
+digitalWrite(Rele_Vent,HIGH);
+}
+else{
+  digitalWrite(Rele_Vent,LOW);
+}
+//temperatura baixa - liga aquecimento
+if (temperatura < temp_min){
+digitalWrite(Rele_Aquecedor,HIGH);
+}
+else{
+  digitalWrite(Rele_Aquecedor,LOW);
+}
+
+//leitura humidade do solo
+humidade_solo();
+//leitura nivel deposito
+nivel_reserv ();
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Hum / Dep");
+  lcd.setCursor(0, 1);
+  lcd.print(humidadeSoloPorcentagem);
+  lcd.print("  " );
+   lcd.print(distanceCm);
+delay (2000); 
+
+//verifica se a humidade esta elevada
+
+
+//se a humidade for eleveda ou nivel agua baixo desliga a bomba de agua
+
+
+if (humidadeSoloPorcentagem > hum_max || distanceCm > dist_min)
+{
+digitalWrite(Rele_Bomba,LOW);
+}
+else{
+  digitalWrite(Rele_Bomba,HIGH);
+}
+
+ 
+}
+
+void nivel_reserv (){
+  // --- Leitura do Sensor Ultrassónico ---
+  digitalWrite(TRIG_PIN, LOW);
+  delayMicroseconds(2);
+  
+  digitalWrite(TRIG_PIN, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(TRIG_PIN, LOW);
+  
+  duration = pulseIn(ECHO_PIN, HIGH);
+  distanceCm = duration * SOUND_SPEED / 2;
+  
+  delay(50); 
+
+//display na porta serie
+ //Serial.print("distancia ");
+//Serial.println(distanceCm);
+
+}
+
+void temperatura_ar(){
+  // --- Leitura do DHT11 (Ar) ---
+  temperatura = dht.readTemperature(); 
+  
+  //display porta serie
+// Serial.print("temperatura ");
+ // Serial.println(temperatura);
+
+}
+
+void humidade_solo(){
+  // --- Leitura do Solo ---
+  humidadeSolo = analogRead(SOLO_PIN); 
+  humidadeSoloPorcentagem = map(humidadeSolo, 1023, 200, 0, 100);
+  humidadeSoloPorcentagem = constrain(humidadeSoloPorcentagem, 0, 100);
+  //display porta serie
+ //Serial.print("humidade ");
+ // Serial.println(humidadeSoloPorcentagem);
+}
